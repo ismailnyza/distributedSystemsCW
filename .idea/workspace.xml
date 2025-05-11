@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="863328d6-0b02-453f-837d-c35245ae5862" name="Changes" comment="zooker and etcd initalized&#10;scripts work">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/Main.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/adapter/gateway/PropertiesConfigurationProvider.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/domain/port/ConfigurationPort.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/config/AppConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/coordination/etcd/EtcdClientManager.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/coordination/zk/ZooKeeperClientManager.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/coordination/zk/ZooKeeperConnectionListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/main/ConcertNode.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/proto/concert_system_v2.proto" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/config.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/scripts/dev_services.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/scripts/start_dev_env.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/simplelogger.properties" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Interface" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/bin/php" />
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
+  <component name="ProjectId" id="2wutAQrMDESXd1AO8ySl7UfZCXF" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Maven.concert-ticket-system-v2 [clean].executor": "Run",
+    "Maven.concert-ticket-system-v2 [org.apache.maven.plugins:maven-clean-plugin:3.2.0:clean].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "SHELLCHECK.PATH": "/home/ismil/.local/share/JetBrains/IntelliJIdea2025.1/Shell Script/shellcheck",
+    "git-widget-placeholder": "master",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "onboarding.tips.debug.path": "/home/ismil/Desktop/MSC/Distributed/CW@/distributedSystemCW/untitled/src/main/java/ismailNyza/Main.java",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "reference.settings.project.maven.repository.indices",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CreateClassDialog.RecentsKey">
+      <recent name="W2151443.concertticketsystemv2.infrastructure.main" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/main/resources/scripts" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.23774.435" />
+        <option value="bundled-js-predefined-d6986cc7102b-f27c65a3e318-JavaScript-IU-251.23774.435" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="863328d6-0b02-453f-837d-c35245ae5862" name="Changes" comment="" />
+      <created>1746903146295</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1746903146295</updated>
+      <workItem from="1746903147758" duration="6367000" />
+      <workItem from="1746952559488" duration="813000" />
+      <workItem from="1746953643961" duration="1209000" />
+      <workItem from="1746954860442" duration="6749000" />
+    </task>
+    <task id="LOCAL-00001" summary="intial commit - pom xml">
+      <option name="closed" value="true" />
+      <created>1746910677210</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1746910677210</updated>
+    </task>
+    <task id="LOCAL-00002" summary="added loading configs from app config">
+      <option name="closed" value="true" />
+      <created>1746949845135</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1746949845135</updated>
+    </task>
+    <task id="LOCAL-00003" summary="implementing main node">
+      <option name="closed" value="true" />
+      <created>1746950353506</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1746950353506</updated>
+    </task>
+    <task id="LOCAL-00004" summary="trying to make a bashscript work for starting local etcd">
+      <option name="closed" value="true" />
+      <created>1746953342411</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1746953342411</updated>
+    </task>
+    <task id="LOCAL-00005" summary="zooker and etcd initalized&#10;scripts work">
+      <option name="closed" value="true" />
+      <created>1746955641855</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1746955641855</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="intial commit - pom xml" />
+    <MESSAGE value="added loading configs from app config" />
+    <MESSAGE value="implementing main node" />
+    <MESSAGE value="trying to make a bashscript work for starting local etcd" />
+    <MESSAGE value="zooker and etcd initalized&#10;scripts work" />
+    <option name="LAST_COMMIT_MESSAGE" value="zooker and etcd initalized&#10;scripts work" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/W2151443/Main.java</url>
+          <line>13</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

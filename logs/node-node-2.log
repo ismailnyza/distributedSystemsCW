@@ -1,0 +1,2 @@
+Error: Could not find or load main class com.W2151443.concertticketsystemv2.infrastructure.main.ConcertNode
+Caused by: java.lang.ClassNotFoundException: com.W2151443.concertticketsystemv2.infrastructure.main.ConcertNode
