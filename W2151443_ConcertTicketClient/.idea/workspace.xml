@@ -5,9 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0548aa78-c273-41e0-96d6-a0ee5773db67" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/.idea/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/uow/W2151443/client/ConcertTicketClientApp.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/uow/W2151443/discovery/W2151443EtcdNameServiceClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/proto/W2151443_concert_ticket_service.proto" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/discovery/W2151443EtcdNameServiceClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/proto/W2151443_concert_ticket_service.proto" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/docker_clean.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/readme.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/run_etcd.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -17,26 +28,89 @@
   <component name="ComposerSettings">
     <execution />
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 1
-}]]></component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/bin/php" />
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
   <component name="ProjectId" id="2wxIjv4JzvaFRiSDT2xX8QEhv07" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Application.ConcertTicketClientApp.executor": "Run",
+    "Application.W2151443EtcdNameServiceClient.executor": "Run",
+    "Application.com.uow.W2151443.client.ConcertTicketClientApp.executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "main",
+    "last_directory_selection": "/home/ismil/Desktop/MSC/Distributed/distributedSyStemsCW/W2151443_ConcertTicketClient/src/main/java/com",
+    "last_opened_file_path": "/home/ismil/Desktop/MSC/Distributed/distributedSyStemsCW/W2151443_ConcertTicketClient",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RunManager" selected="Application.com.uow.W2151443.client.ConcertTicketClientApp">
+    <configuration name="ConcertTicketClientApp" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="ConcertTicketClientApp" />
+      <module name="W2151443_ConcertTicketClient" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="W2151443EtcdNameServiceClient" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.uow.W2151443.discovery.W2151443EtcdNameServiceClient" />
+      <module name="W2151443_ConcertTicketClient" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.uow.W2151443.discovery.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="com.uow.W2151443.client.ConcertTicketClientApp" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.uow.W2151443.client.ConcertTicketClientApp" />
+      <module name="W2151443_ConcertTicketClient" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.uow.W2151443.client.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Application.com.uow.W2151443.client.ConcertTicketClientApp" />
+        <item itemvalue="Application.W2151443EtcdNameServiceClient" />
+        <item itemvalue="Application.ConcertTicketClientApp" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -53,6 +127,7 @@
       <option name="presentableId" value="Default" />
       <updated>1746976938565</updated>
       <workItem from="1746976939748" duration="2000" />
+      <workItem from="1746981545311" duration="2765000" />
     </task>
     <servers />
   </component>

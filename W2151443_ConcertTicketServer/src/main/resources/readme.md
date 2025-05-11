@@ -1,0 +1,1 @@
+docker run -d -p 2379:2379 -p 2380:2380 --name etcd quay.io/coreos/etcd:v3.5.9 etcd -advertise-client-urls http://0.0.0.0:2381 -listen-client-urls http://0.0.0.0:2379

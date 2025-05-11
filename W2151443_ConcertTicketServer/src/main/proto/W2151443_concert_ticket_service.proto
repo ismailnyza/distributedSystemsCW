@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package com.uow.W2151443.concert;
+
+option java_multiple_files = true;
+option java_package = "com.uow.W2151443.concert.service"; // Your student ID prefix here
+option java_outer_classname = "W2151443ConcertTicketServiceProto"; // Your student ID prefix here
+
+// ---- Common Enums and Messages ----
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  SHOW_NOT_FOUND = 1;
+  TIER_NOT_FOUND = 2;
+  OUT_OF_STOCK = 3;
+  AFTER_PARTY_NOT_AVAILABLE = 4;
+  INVALID_REQUEST_DATA = 5;
+  INTERNAL_SERVER_ERROR = 6;
+  TRANSACTION_ABORTED = 7;
+  // Add more as needed
+}
+
+message TierDetails {
+  string tier_id = 1;         // e.g., "VIP", "REGULAR_A"
+  string tier_name = 2;       // e.g., "VIP Seating", "Regular Section A"
+  double price = 3;
+  int32 total_stock = 4;
+  int32 current_stock = 5;
+}
+
+message ShowInfo {
+  string show_id = 1;         // Unique ID for the show
+  string show_name = 2;
+  string show_date = 3;       // e.g., "2025-12-25"
+  string venue = 4;
+  map<string, TierDetails> tiers = 5; // Key is tier_id
+  bool after_party_available = 6;
+  int32 after_party_total_stock = 7;
+  int32 after_party_current_stock = 8;
+  string description = 9;
+}
+
+// ---- Service Definitions ----
+
+// Service for Concert Organizers and Box Office Clerks
+service W2151443ShowManagementService {
+  rpc AddShow(AddShowRequest) returns (GenericResponse);
+  rpc UpdateShowDetails(UpdateShowDetailsRequest) returns (GenericResponse); // For price, date, general info
+  rpc UpdateStock(UpdateStockRequest) returns (GenericResponse); // Specifically for stock levels
+  rpc CancelShow(CancelShowRequest) returns (GenericResponse);
+}
+
+// Service for Customers and Event Coordinators
+service W2151443ReservationService {
+  rpc BrowseEvents(BrowseEventsRequest) returns (BrowseEventsResponse);
+  rpc GetShowAvailability(GetShowAvailabilityRequest) returns (ShowInfo); // Could also return a subset of ShowInfo
+  rpc ReserveTicket(ReserveTicketRequest) returns (ReservationResponse); // Concert only
+  rpc ReserveCombo(ReserveComboRequest) returns (ReservationResponse);   // Concert + After-Party (Atomic)
+}
+
+// Service for Server-to-Server communication (internal)
+service W2151443InternalNodeService {
+  // For primary-based replication of writes
+  rpc ReplicateShowUpdate(ShowInfo) returns (GenericResponse); // Sent by primary to secondaries
+  rpc ReplicateStockChange(UpdateStockRequest) returns (GenericResponse); // For more granular stock replication
+
+  // For 2PC
+  rpc PrepareTransaction(TransactionRequest) returns (VoteResponse);
+  rpc CommitTransaction(TransactionDecision) returns (GenericResponse);
+  rpc AbortTransaction(TransactionDecision) returns (GenericResponse);
+
+  // For Node Rejoining
+  rpc GetFullState(GetFullStateRequest) returns (FullStateResponse);
+}
+
+
+// ---- Request/Response Messages for ShowManagementService ----
+
+message AddShowRequest {
+  ShowInfo show_info = 1;
+  // Potentially an idempotency_key if needed here too
+}
+
+message UpdateShowDetailsRequest {
+  string show_id = 1;
+  // Add fields for what can be updated, e.g.,
+  optional string show_name = 2;
+  optional string show_date = 3;
+  optional string venue = 4;
+  optional string description = 5;
+  // Price updates might be complex if tiers change, consider separate RPC or part of Add/UpdateTier
+}
+
+message UpdateStockRequest {
+  string request_id = 1; // For idempotency
+  string show_id = 2;
+  optional string tier_id = 3; // If updating a specific tier
+  optional int32 change_in_tier_stock = 4; // Can be positive (add) or negative (admin removal, not reservation)
+  optional int32 change_in_after_party_stock = 5; // Can be positive or negative
+}
+
+message CancelShowRequest {
+  string show_id = 1;
+}
+
+message GenericResponse {
+  bool success = 1;
+  string message = 2;
+  optional ErrorCode error_code = 3;
+}
+
+
+// ---- Request/Response Messages for ReservationService ----
+
+message BrowseEventsRequest {
+  optional string filter_by_date = 1; // e.g., "2025-12-*" or "ALL"
+  // Add other filters if needed: genre, venue etc.
+}
+
+message BrowseEventsResponse {
+  repeated ShowInfo shows = 1;
+}
+
+message GetShowAvailabilityRequest {
+  string show_id = 1;
+}
+
+message ReservationItem {
+  string tier_id = 1;
+  int32 quantity = 2;
+}
+
+message ReserveTicketRequest {
+  string request_id = 1; // For idempotency
+  string show_id = 2;
+  repeated ReservationItem items = 3; // Allows reserving multiple tickets of different tiers in one go
+  string customer_id = 4; // Or some form of customer identification
+  // Payment details usually handled separately or tokenized, not in scope for core DS logic here
+}
+
+message ReserveComboRequest {
+  string request_id = 1; // For idempotency
+  string show_id = 2;
+  repeated ReservationItem concert_items = 3;
+  int32 after_party_quantity = 4; // Should match total concert tickets for simplicity, or be per ticket
+  string customer_id = 5;
+}
+
+message ReservationResponse {
+  bool success = 1;
+  string message = 2;
+  optional ErrorCode error_code = 3;
+  optional string reservation_id = 4; // If successful
+  optional ShowInfo updated_show_info = 5; // To reflect new availability
+}
+
+// ---- Request/Response Messages for InternalNodeService ----
+message TransactionRequest {
+    string transaction_id = 1;
+    // Details of what needs to be prepared, e.g., which show, tier, after-party, quantity
+    ReserveComboRequest original_combo_request = 2; // Pass the original request for context
+}
+
+message VoteResponse {
+    string transaction_id = 1;
+    bool vote_commit = 2; // true for COMMIT, false for ABORT
+    string node_id = 3; // Identifier of the voting node
+}
+
+message TransactionDecision {
+    string transaction_id = 1;
+    // Potentially a message if any specific reason for abort needed by participants
+}
+
+message GetFullStateRequest {
+    string requesting_node_id = 1;
+}
+
+message FullStateResponse {
+    map<string, ShowInfo> all_shows_data = 1;
+    // Potentially other parts of the state if there are more complex data structures
+}
