@@ -150,7 +150,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.W2151443.concertticketsystemv2.infrastructure.main.ConcertNode</mainClass>
+                                    <mainClass>W2151443.concertticketsystemv2.infrastructure.main.ConcertNode</mainClass>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
