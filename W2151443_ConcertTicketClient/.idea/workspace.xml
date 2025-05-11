@@ -5,20 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0548aa78-c273-41e0-96d6-a0ee5773db67" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/uow/W2151443/client/ConcertTicketClientApp.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/uow/W2151443/discovery/W2151443EtcdNameServiceClient.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/proto/W2151443_concert_ticket_service.proto" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/discovery/W2151443EtcdNameServiceClient.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/proto/W2151443_concert_ticket_service.proto" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/docker_clean.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/readme.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/run_etcd.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/W2151443LeaderElection.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/resources/run_zookeeper.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443ShowManagementServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443ShowManagementServiceImpl.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -127,7 +120,7 @@
       <option name="presentableId" value="Default" />
       <updated>1746976938565</updated>
       <workItem from="1746976939748" duration="2000" />
-      <workItem from="1746981545311" duration="2765000" />
+      <workItem from="1746981545311" duration="4116000" />
     </task>
     <servers />
   </component>

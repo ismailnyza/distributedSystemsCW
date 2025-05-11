@@ -5,15 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="863328d6-0b02-453f-837d-c35245ae5862" name="Changes" comment="zooker and etcd initalized&#10;scripts work">
-      <change afterPath="$PROJECT_DIR$/W2151443_ConcertTicketClient/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/W2151443_ConcertTicketClient/src/main/java/ConcertTicketClientApp.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/W2151443_ConcertTicketClient/src/main/proto/W2151443_concert_ticket_service.proto" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/W2151443_ConcertTicketServer/src/main/proto/W2151443_concert_ticket_service.proto" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/W2151443_ConcertTicketClient/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/W2151443_ConcertTicketClient/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/W2151443_ConcertTicketClient/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/W2151443_ConcertTicketClient/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/W2151443_ConcertTicketServer/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/W2151443_ConcertTicketServer/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -105,6 +97,7 @@
       <workItem from="1746954860442" duration="6749000" />
       <workItem from="1746976644320" duration="4462000" />
       <workItem from="1746981395613" duration="359000" />
+      <workItem from="1746986815836" duration="35000" />
     </task>
     <task id="LOCAL-00001" summary="intial commit - pom xml">
       <option name="closed" value="true" />
