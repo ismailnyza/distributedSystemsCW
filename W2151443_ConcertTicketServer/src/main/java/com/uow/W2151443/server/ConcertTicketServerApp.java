@@ -3,6 +3,7 @@ package com.uow.W2151443.server;
 import com.uow.W2151443.concert.service.ShowInfo;
 import com.uow.W2151443.coordination.W2151443LeaderElection; // Import LeaderElection class
 import com.uow.W2151443.discovery.W2151443EtcdNameServiceClient;
+import com.uow.W2151443.server.service.W2151443InternalNodeServiceImpl;
 import com.uow.W2151443.server.service.W2151443ReservationServiceImpl;
 import com.uow.W2151443.server.service.W2151443ShowManagementServiceImpl;
 import io.grpc.Server;
@@ -28,9 +29,9 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
     private final Map<String, ShowInfo> W2151443_showsDataStore = new ConcurrentHashMap<>();
 
     // etcd related fields
-    private W2151443EtcdNameServiceClient etcdClient;
+    public W2151443EtcdNameServiceClient etcdClient;
     private final String etcdUrl = "http://localhost:2381"; // Your etcd instance URL
-    private final String etcdServiceBasePath = "/services/W2151443ConcertTicketService";
+    public final String etcdServiceBasePath = "/services/W2151443ConcertTicketService";
     private final String etcdLeaderPath = etcdServiceBasePath + "/_leader"; // Specific key for current leader
     public String etcdServiceInstanceId; // Unique ID for this server's general registration
     private final int serviceRegistryTTL = 30;
@@ -78,10 +79,12 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
         // and potentially get leader address for forwarding (though forwarding logic is in services)
         W2151443ShowManagementServiceImpl showManagementService = new W2151443ShowManagementServiceImpl(W2151443_showsDataStore, this);
         W2151443ReservationServiceImpl reservationService = new W2151443ReservationServiceImpl(W2151443_showsDataStore, this);
+        W2151443InternalNodeServiceImpl internalNodeService = new W2151443InternalNodeServiceImpl(W2151443_showsDataStore, this); // Pass 'this'
 
         grpcServer = ServerBuilder.forPort(grpcPort)
                 .addService(showManagementService)
                 .addService(reservationService)
+                .addService(internalNodeService) // Make sure this line is present
                 .build()
                 .start();
         logger.info("W2151443 gRPC Server started, listening on port: " + grpcPort + " with instance ID: " + etcdServiceInstanceId);
