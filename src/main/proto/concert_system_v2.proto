@@ -1,0 +1,187 @@
+syntax = "proto3";
+
+// Make sure your package name here matches your Java base package
+package  W2151443.concertticketsystemv2;
+
+option java_multiple_files = true;
+// This will be the package for the generated Java gRPC classes
+option java_package = "com.W2151443.concertticketsystemv2.grpc.generated";
+option java_outer_classname = "ConcertSystemV2Proto";
+
+// ---- Data Structures ----
+message ConcertInfo {
+  string concert_id = 1;
+  string name = 2;
+  string date = 3; // Consider using google.protobuf.Timestamp for richer date/time
+  map<string, SeatTierInfo> seat_tiers = 4;
+  int32 total_after_party_tickets = 5;
+  int32 available_after_party_tickets = 6;
+  bool is_active = 7;
+  int64 version = 8; // For optimistic locking or simple versioning by primary
+}
+
+message SeatTierInfo {
+  string tier_name = 1;
+  double price = 2;
+  int32 total_seats = 3;
+  int32 available_seats = 4;
+}
+
+message SeatTierInput { // Used when adding/updating concerts
+  string tier_name = 1;
+  double price = 2;
+  int32 total_seats = 3;
+}
+
+// ---- Admin Service ----
+service ConcertAdminService {
+  // All write operations will be subject to 2PC coordinated by the Primary
+  rpc AddConcert (AddConcertRequest) returns (OperationStatusResponse);
+  rpc UpdateConcert (UpdateConcertRequest) returns (OperationStatusResponse);
+  rpc CancelConcert (CancelConcertRequest) returns (OperationStatusResponse);
+  rpc UpdateTicketStock(UpdateStockRequest) returns (OperationStatusResponse);
+}
+
+message AddConcertRequest {
+  string request_id = 1; // For idempotency
+  string name = 2;
+  string date = 3;
+  repeated SeatTierInput seat_tiers = 4;
+  int32 total_after_party_tickets = 5;
+}
+
+message UpdateConcertRequest {
+  string request_id = 1; // For idempotency
+  string concert_id = 2;
+  optional string name = 3;
+  optional string date = 4;
+  // For simplicity in 2PC, the payload for update might be the full target ConcertInfo
+  // or specific delta operations. Let's assume for now the logic will handle partial updates.
+  // To update seat tiers or after-party tickets, specific fields or a sub-message would be needed.
+  // For now, let's keep it simple and assume updates are handled by the use case based on what's set.
+}
+
+message CancelConcertRequest {
+  string request_id = 1; // For idempotency
+  string concert_id = 2;
+}
+
+message UpdateStockRequest {
+    string request_id = 1; // For idempotency
+    string concert_id = 2;
+    optional string tier_name = 3; // If updating a specific tier
+    optional int32 change_in_available_seats = 4; // Can be positive or negative (admin adjustment)
+    optional int32 change_in_total_seats = 5;     // If admin is changing capacity
+    optional int32 change_in_available_after_party_tickets = 6;
+    optional int32 change_in_total_after_party_tickets = 7;
+    optional double new_price_for_tier = 8;
+}
+
+message OperationStatusResponse {
+  bool success = 1;
+  string message = 2;
+  string resource_id = 3; // e.g., concert_id
+  string transaction_id = 4; // The ID of the 2PC transaction if applicable
+}
+
+// ---- Customer Service ----
+service ConcertCustomerService {
+  rpc ListConcerts (ListConcertsRequest) returns (ListConcertsResponse);
+  // ReserveTickets will be subject to 2PC coordinated by the Primary
+  rpc ReserveTickets (ReserveTicketsRequest) returns (ReservationResponse);
+}
+
+message ListConcertsRequest {
+  bool include_cancelled = 1 ;
+  // Potential filters: date_range, city, etc. (out of scope for now)
+}
+
+message ListConcertsResponse {
+  repeated ConcertInfo concerts = 1;
+}
+
+message ReserveTicketsRequest {
+  string request_id = 1; // For idempotency
+  string concert_id = 2;
+  string seat_tier_name = 3;
+  int32 number_of_seats = 4;
+  bool reserve_after_party = 5;
+  // string customer_id = 6; // Optional
+  // PaymentDetails payment_details = 7; // Out of scope
+}
+
+message ReservationResponse {
+  bool success = 1;
+  string message = 2;
+  string reservation_id = 3;
+  string concert_id = 4;
+  string seat_tier_name = 5;
+  int32 seats_reserved = 6;
+  bool after_party_reserved = 7;
+  double total_cost = 8;
+  string transaction_id = 9; // The ID of the 2PC transaction
+}
+
+// ---- Internal Node Service (for 2PC & State Sync) ----
+service InternalNodeCommService {
+  // Phase 1 of 2PC: Primary (Coordinator) sends to Participants
+  rpc CanCommitTransaction (VoteRequest) returns (VoteResponse);
+  // Phase 2 of 2PC: Primary (Coordinator) sends Global Decision to Participants
+  rpc DoCommitTransaction (GlobalDecisionRequest) returns (AckResponse);
+  rpc DoAbortTransaction (GlobalDecisionRequest) returns (AckResponse);
+
+  // State Synchronization: Follower calls on Primary
+  rpc SynchronizeState (StateSyncRequest) returns (StateSyncResponse);
+}
+
+message TransactionOperationDetails {
+  enum OperationType {
+    OP_UNSPECIFIED = 0;
+    OP_ADD_CONCERT = 1;
+    OP_UPDATE_CONCERT = 2;
+    OP_CANCEL_CONCERT = 3;
+    OP_RESERVE_TICKETS = 4;
+    OP_UPDATE_STOCK = 5;
+  }
+  OperationType operation_type = 1;
+  bytes payload = 2; // Serialized original request (e.g., AddConcertRequest, ReserveTicketsRequest bytes)
+  string target_resource_id = 3; // e.g., concert_id for most operations. Helpful for participant validation.
+}
+
+message VoteRequest {
+  string transaction_id = 1; // Unique ID for this 2PC transaction
+  TransactionOperationDetails operation_details = 2;
+  string coordinator_node_id = 3; // ID of the primary node initiating the 2PC
+}
+
+message VoteResponse {
+  string transaction_id = 1;
+  bool vote_commit = 2; // true for VOTE_COMMIT, false for VOTE_ABORT
+  string participant_node_id = 3;
+  string message = 4; // Optional: reason for abort
+}
+
+message GlobalDecisionRequest {
+  string transaction_id = 1;
+  // The payload might not be needed again if participants stored it during CanCommit,
+  // but can be included for stateless participants or verification.
+  // optional TransactionOperationDetails committed_operation_details = 2;
+}
+
+message AckResponse {
+  string transaction_id = 1;
+  bool acknowledged = 2;
+  string node_id = 3;
+  string message = 4; // Optional
+}
+
+message StateSyncRequest {
+  string requesting_node_id = 1;
+  // int64 last_known_transaction_id_from_primary = 2; // For potential delta sync later
+}
+
+message StateSyncResponse {
+  repeated ConcertInfo all_concerts = 1;
+  int64 last_committed_transaction_id_on_primary = 2; // Primary's current transaction high water mark
+  // Could also include other parts of the state if necessary
+}
