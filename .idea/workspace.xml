@@ -5,25 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="863328d6-0b02-453f-837d-c35245ae5862" name="Changes" comment="zooker and etcd initalized&#10;scripts work">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/node-node-1.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/node-node-2.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/node-node-3.log" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/Main.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/adapter/gateway/PropertiesConfigurationProvider.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/domain/port/ConfigurationPort.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/config/AppConfig.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/coordination/etcd/EtcdClientManager.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/coordination/zk/ZooKeeperClientManager.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/coordination/zk/ZooKeeperConnectionListener.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/W2151443/concertticketsystemv2/infrastructure/main/ConcertNode.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/proto/concert_system_v2.proto" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/config.properties" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/scripts/dev_services.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/scripts/start_dev_env.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/simplelogger.properties" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,7 +49,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "SHELLCHECK.PATH": "/home/ismil/.local/share/JetBrains/IntelliJIdea2025.1/Shell Script/shellcheck",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "main",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
