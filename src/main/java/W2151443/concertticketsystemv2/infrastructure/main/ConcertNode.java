@@ -1,15 +1,15 @@
 package W2151443.concertticketsystemv2.infrastructure.main;
 
 import W2151443.concertticketsystemv2.infrastructure.config.AppConfig;
-// Import other necessary infrastructure managers and services later
+import W2151443.concertticketsystemv2.infrastructure.coordination.etcd.EtcdClientManager; // Import
 // import com.W2151443.concertticketsystemv2.infrastructure.grpc.GrpcServerManager;
-// import com.W2151443.concertticketsystemv2.infrastructure.coordination.etcd.EtcdClientManager;
 // import com.W2151443.concertticketsystemv2.infrastructure.coordination.zk.ZooKeeperClientManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects; // Add import for validation
 // import java.util.concurrent.TimeUnit;
 
 public class ConcertNode {
@@ -20,17 +20,22 @@ public class ConcertNode {
     private final int grpcPort;
     private final String nodeGrpcAddress;
 
+    // Add EtcdClientManager
+    private EtcdClientManager etcdClientManager;
+    private String etcdNodeRegistrationPath; // Key for this node in etcd
+
     // To be initialized later
     // private GrpcServerManager grpcServerManager;
-    // private EtcdClientManager etcdClientManager;
     // private ZooKeeperClientManager zooKeeperClientManager;
-    // private LeaderElectionService leaderElectionService;
-    // private NameServiceProvider nameServiceProvider;
     // ... other services and managers ...
 
     public ConcertNode(String nodeId, String host, int grpcPort) {
-        this.nodeId = nodeId;
-        this.host = host;
+        // Validate inputs
+        this.nodeId = Objects.requireNonNull(nodeId, "Node ID cannot be null");
+        this.host = Objects.requireNonNull(host, "Host cannot be null");
+        if (grpcPort <= 0 || grpcPort > 65535) {
+            throw new IllegalArgumentException("Invalid gRPC port: " + grpcPort);
+        }
         this.grpcPort = grpcPort;
         this.nodeGrpcAddress = host + ":" + grpcPort;
 
@@ -40,101 +45,82 @@ public class ConcertNode {
     public void start() throws IOException, InterruptedException {
         LOGGER.info("Starting ConcertNode {} on {}...", nodeId, nodeGrpcAddress);
 
-        // 1. Initialize Configuration (already done statically by AppConfig, but can fetch dynamic here)
-        // String etcdEndpoints = AppConfig.getString("etcd.endpoints");
+        // 1. Initialize Configuration
+        String etcdEndpoints = AppConfig.getString("etcd.endpoints");
         // String zkConnectString = AppConfig.getString("zookeeper.connectString");
-        // LOGGER.info("Using etcd endpoints: {}", etcdEndpoints);
+        LOGGER.info("Using etcd endpoints: {}", etcdEndpoints);
         // LOGGER.info("Using ZooKeeper connect string: {}", zkConnectString);
 
-        // 2. Initialize EtcdClientManager and NameServiceProvider
-        // etcdClientManager = new EtcdClientManager(etcdEndpoints);
-        // etcdClientManager.connect();
-        // nameServiceProvider = new EtcdNameServiceProvider(etcdClientManager.getClient(), nodeId, nodeGrpcAddress); // Simplified
-        // nameServiceProvider.registerNode(); // Start registration and TTL refresh
+        // 2. Initialize EtcdClientManager and Register Node
+        etcdClientManager = new EtcdClientManager(etcdEndpoints);
+        etcdClientManager.connect(); // Connect to etcd
 
-        // 3. Initialize ZooKeeperClientManager and LeaderElectionService, DistributedLockManager
-        // zooKeeperClientManager = new ZooKeeperClientManager(zkConnectString);
-        // zooKeeperClientManager.connect();
-        // leaderElectionService = new ZkLeaderElectionService(zooKeeperClientManager.getClient(), nodeId, nodeGrpcAddress, nameServiceProvider);
-        // leaderElectionService.participateInElection();
-        // distributedLockManager = new ZkDistributedLockManager(zooKeeperClientManager.getClient(), nodeId);
+        // Construct the key for this node's registration
+        String nodesBasePath = AppConfig.getString("etcd.service.nodes.path", "/services/concert_system_v2/nodes");
+        this.etcdNodeRegistrationPath = nodesBasePath + "/" + this.nodeId;
+        long ttlSeconds = AppConfig.getLong("etcd.ttl.seconds", 10L);
 
-        // 4. Initialize Data Store
-        // concertRepository = new InMemoryConcertRepository();
-        // reservationRepository = new InMemoryReservationRepository();
+        boolean registered = etcdClientManager.registerWithLease(this.etcdNodeRegistrationPath, this.nodeGrpcAddress, ttlSeconds);
+        if (!registered) {
+            LOGGER.error("Node {} failed to register with etcd. This might affect service discovery.", nodeId);
+            // Decide on critical failure or proceed in a degraded state
+            // For now, we proceed, but other nodes might not see it.
+        } else {
+            LOGGER.info("Node {} successfully registered in etcd at {} with value {} and TTL {}s.",
+                    nodeId, this.etcdNodeRegistrationPath, this.nodeGrpcAddress, ttlSeconds);
+        }
 
-        // 5. Initialize Use Cases (and inject dependencies)
-        // These would be created and then passed to Grpc Controllers
 
-        // 6. Initialize and Start gRPC Server with Service Implementations (Controllers)
-        // ConcertAdminGrpcController adminController = new ConcertAdminGrpcController(...useCases...);
-        // ConcertCustomerGrpcController customerController = new ConcertCustomerGrpcController(...useCases...);
-        // InternalNodeCommGrpcController internalController = new InternalNodeCommGrpcController(...);
-        // grpcServerManager = new GrpcServerManager(grpcPort, adminController, customerController, internalController);
-        // grpcServerManager.start();
+        // 3. Initialize ZooKeeperClientManager (placeholder for next ticket)
+        // ...
 
-        LOGGER.info("ConcertNode {} started successfully.", nodeId);
+        // ... other initializations ...
 
-        // Keep main thread alive for server, or if GrpcServerManager.start() blocks, this is not needed here.
-        // For now, we'll assume gRPC server starts and blocks or we use awaitTermination.
-        // If grpcServerManager.start() is non-blocking:
-        // Thread.currentThread().join(); // Or a more sophisticated shutdown mechanism
+        LOGGER.info("ConcertNode {} started successfully (etcd registration attempted).", nodeId);
+
+        // Keep main thread alive (as before)
+        Object keepAlive = new Object();
+        synchronized (keepAlive) {
+            keepAlive.wait();
+        }
     }
 
     public void stop() throws InterruptedException {
         LOGGER.info("Stopping ConcertNode {}...", nodeId);
-        // if (grpcServerManager != null) {
-        //     grpcServerManager.stop();
-        // }
-        // if (leaderElectionService != null) {
-        //     leaderElectionService.stepDown(); // Relinquish leadership if held
-        // }
-        // if (nameServiceProvider != null) {
-        //     nameServiceProvider.deregisterNode(); // Stop TTL refresh and attempt deregister
-        // }
-        // if (etcdClientManager != null) {
-        //     etcdClientManager.close();
-        // }
-        // if (zooKeeperClientManager != null) {
-        //     zooKeeperClientManager.close();
-        // }
+
+        if (etcdClientManager != null) {
+            // Deregistration is handled by etcdClientManager.close() which calls its own deregister()
+            etcdClientManager.close();
+        }
+
+        // ... stop other managers ...
         LOGGER.info("ConcertNode {} stopped.", nodeId);
     }
 
     public static void main(String[] args) {
+        // Validate and parse arguments
         if (args.length < 3) {
-            // Command line: nodeId host grpcPort
-            // Config file: etcd.endpoints, zookeeper.connectString
             System.err.println("Usage: ConcertNode <nodeId> <host> <grpcPort>");
-            System.err.println("Example: ConcertNode node-1 localhost 50051");
-            System.err.println("Ensure config.properties is in the classpath for etcd/zookeeper details.");
             System.exit(1);
         }
 
         String nodeId = args[0];
         String host = args[1];
-        int grpcPort = 0;
+        int grpcPort;
         try {
             grpcPort = Integer.parseInt(args[2]);
         } catch (NumberFormatException e) {
-            LOGGER.error("Invalid gRPC port provided: {}", args[2]);
+            System.err.println("Invalid gRPC port: " + args[2]);
             System.exit(1);
+            return; // Unreachable, but required for compilation
         }
-
-        // AppConfig is loaded statically, values can be accessed via AppConfig.getString(...)
-        LOGGER.info("Attempting to start Node ID: {}, Host: {}, gRPC Port: {}", nodeId, host, grpcPort);
-        LOGGER.info("Loading bootstrap config from AppConfig. Etcd: {}, ZK: {}",
-                AppConfig.getString("etcd.endpoints", "NOT_FOUND"),
-                AppConfig.getString("zookeeper.connectString", "NOT_FOUND"));
-
 
         final ConcertNode node = new ConcertNode(nodeId, host, grpcPort);
 
-        // Graceful shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOGGER.warn("*** ConcertNode {} JVM Shutting Down. Initiating stop sequence. ***", nodeId);
             try {
-                node.stop();
+                node.stop(); // This will now call etcdClientManager.close()
             } catch (InterruptedException e) {
                 LOGGER.error("Error during node shutdown:", e);
                 Thread.currentThread().interrupt();
@@ -144,37 +130,19 @@ public class ConcertNode {
 
         try {
             node.start();
-            // If GrpcServerManager.start() is blocking and has awaitTermination,
-            // then the main thread will block here.
-            // Otherwise, we might need a Server.awaitTermination() call here or Thread.join().
-            // For now, let's assume start() will block or handle its own blocking.
-            // To prevent main from exiting immediately if start() is non-blocking and doesn't join:
-            // This is a simple way to keep it alive; a proper server would use awaitTermination on its gRPC server.
-            Object keepAlive = new Object();
-            synchronized (keepAlive) {
-                keepAlive.wait();
-            }
-
         } catch (IOException e) {
             LOGGER.error("Failed to start ConcertNode {}: {}", nodeId, e.getMessage(), e);
             System.exit(1);
         } catch (InterruptedException e) {
             LOGGER.warn("ConcertNode {} main thread interrupted. Shutting down...", nodeId);
-            Thread.currentThread().interrupt(); // Preserve interrupt status
+            Thread.currentThread().interrupt();
             try {
-                node.stop(); // Attempt graceful shutdown
+                node.stop();
             } catch (InterruptedException ex) {
                 LOGGER.error("Error during node shutdown after interrupt:", ex);
             }
         }
     }
 
-    // Getters for nodeId, nodeGrpcAddress for other components if needed
-    public String getNodeId() {
-        return nodeId;
-    }
-
-    public String getNodeGrpcAddress() {
-        return nodeGrpcAddress;
-    }
+    // ... getters ...
 }
