@@ -51,8 +51,9 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
     private ZooKeeper zooKeeperClient;
 
     public final Map<String, ReserveComboRequest> pendingComboTransactions = new ConcurrentHashMap<>();
-    private final W2151443LeaderElection.LeaderChangeListener leaderChangeListener = this; // Explicitly for clarity
-    private final DistributedTxListener distributedTxListener = this; // Explicitly for clarity
+    private final W2151443LeaderElection.LeaderChangeListener leaderChangeListener = this;
+    // Store reference to InternalNodeService to call removeActiveParticipant
+    private W2151443InternalNodeServiceImpl internalNodeServiceInstance;
 
 
     public ConcertTicketServerApp(int grpcPort, String serverIdSuffix) {
@@ -104,7 +105,7 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
                 } else if (watchedEvent.getState() == Event.KeeperState.Expired) {
                     logger.severe(etcdServiceInstanceId + ": Main ZooKeeper session EXPIRED. This is critical.");
                     isCurrentlyLeader = false;
-                    leaderChangeListener.onWorker(); // Call onWorker via the LeaderChangeListener reference
+                    leaderChangeListener.onWorker();
                     try {
                         logger.info(etcdServiceInstanceId + ": Attempting to re-initialize ZooKeeper connection and leader election after session expiry.");
                         if (zooKeeperClient != null) try { zooKeeperClient.close(); } catch (InterruptedException ignored) {}
@@ -123,7 +124,7 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
                     if (isCurrentlyLeader) {
                         logger.warning(etcdServiceInstanceId + ": Was leader, but now disconnected from ZK. Acting as worker until reconnected and leadership re-confirmed.");
                         isCurrentlyLeader = false;
-                        leaderChangeListener.onWorker(); // Call onWorker via the LeaderChangeListener reference
+                        leaderChangeListener.onWorker();
                     }
                 }
             }
@@ -156,17 +157,19 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
 
         logger.info(etcdServiceInstanceId + ": Initializing Leader Election using shared ZK client, path " + zkElectionBasePath);
         leaderElection = new W2151443LeaderElection(zooKeeperClient, zkElectionBasePath,
-                etcdServiceInstanceId, getServerAddress(), this); // 'this' is the LeaderChangeListener
+                etcdServiceInstanceId, getServerAddress(), this);
         leaderElection.volunteerForLeadership();
 
         W2151443ShowManagementServiceImpl showManagementService = new W2151443ShowManagementServiceImpl(W2151443_showsDataStore, this);
         W2151443ReservationServiceImpl reservationService = new W2151443ReservationServiceImpl(W2151443_showsDataStore, this);
-        W2151443InternalNodeServiceImpl internalNodeService = new W2151443InternalNodeServiceImpl(W2151443_showsDataStore, this);
+        // Store the instance of W2151443InternalNodeServiceImpl to call its methods
+        this.internalNodeServiceInstance = new W2151443InternalNodeServiceImpl(W2151443_showsDataStore, this);
+
 
         grpcServer = ServerBuilder.forPort(grpcPort)
                 .addService(showManagementService)
                 .addService(reservationService)
-                .addService(internalNodeService)
+                .addService(this.internalNodeServiceInstance) // Use the stored instance
                 .build()
                 .start();
         logger.info("W2151443 gRPC Server started, listening on port: " + grpcPort + " with instance ID: " + etcdServiceInstanceId);
@@ -248,14 +251,16 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
 
     @Override
     public void onGlobalCommit(String transactionIdContext) {
-        String coreTransactionId = transactionIdContext.contains("_") ?
-                transactionIdContext.substring(0, transactionIdContext.indexOf("_")) :
-                transactionIdContext;
+        String coreTransactionId = transactionIdContext.startsWith("tx-combo-") ?
+                transactionIdContext.substring(0, transactionIdContext.indexOf("_", "tx-combo-".length())) :
+                (transactionIdContext.contains("_") ? transactionIdContext.substring(0, transactionIdContext.indexOf("_")) : transactionIdContext);
+
 
         ReserveComboRequest details = pendingComboTransactions.remove(coreTransactionId);
 
         if (details == null) {
             logger.warning(etcdServiceInstanceId + ": Received onGlobalCommit for unknown or already processed transaction context: " + transactionIdContext + " (core TxID: " + coreTransactionId + ")");
+            if(internalNodeServiceInstance != null) internalNodeServiceInstance.removeActiveParticipant(coreTransactionId); // Still try to cleanup participant map
             return;
         }
         logger.info(etcdServiceInstanceId + ": Applying GLOBAL COMMIT for TxID: " + coreTransactionId + " related to original request for Show: " + details.getShowId());
@@ -263,6 +268,7 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
             ShowInfo currentShow = W2151443_showsDataStore.get(details.getShowId());
             if (currentShow == null) {
                 logger.severe(etcdServiceInstanceId + ": CRITICAL - Show " + details.getShowId() + " not found during onGlobalCommit for TxID: " + coreTransactionId + ". Data inconsistency!");
+                if(internalNodeServiceInstance != null) internalNodeServiceInstance.removeActiveParticipant(coreTransactionId);
                 return;
             }
 
@@ -283,19 +289,23 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
             W2151443_showsDataStore.put(details.getShowId(), updatedShowInfo);
             logger.info(etcdServiceInstanceId + ": Local data committed for TxID: " + coreTransactionId + ". Show: " + details.getShowId() + " updated. New AP Stock: " + updatedShowInfo.getAfterPartyCurrentStock());
         }
+        if(internalNodeServiceInstance != null) internalNodeServiceInstance.removeActiveParticipant(coreTransactionId);
     }
+
 
     @Override
     public void onGlobalAbort(String transactionIdContext) {
-        String coreTransactionId = transactionIdContext.contains("_") ?
-                transactionIdContext.substring(0, transactionIdContext.indexOf("_")) :
-                transactionIdContext;
+        String coreTransactionId = transactionIdContext.startsWith("tx-combo-") ?
+                transactionIdContext.substring(0, transactionIdContext.indexOf("_", "tx-combo-".length())) :
+                (transactionIdContext.contains("_") ? transactionIdContext.substring(0, transactionIdContext.indexOf("_")) : transactionIdContext);
+
         ReserveComboRequest removed = pendingComboTransactions.remove(coreTransactionId);
         if (removed != null) {
             logger.info(etcdServiceInstanceId + ": Applying GLOBAL ABORT for transaction context: " + transactionIdContext + " (core TxID: " + coreTransactionId + "). Request details: " + removed.getRequestId());
         } else {
-            logger.warning(etcdServiceInstanceId + ": Received onGlobalAbort for unknown or already processed transaction context: " + transactionIdContext);
+            logger.warning(etcdServiceInstanceId + ": Received onGlobalAbort for unknown or already processed transaction context: " + transactionIdContext + " (core TxID: "+coreTransactionId+")");
         }
+        if(internalNodeServiceInstance != null) internalNodeServiceInstance.removeActiveParticipant(coreTransactionId);
     }
 
 
@@ -304,7 +314,7 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
             try {
                 if (zooKeeperClient == null || zooKeeperClient.getState() != ZooKeeper.States.CONNECTED) {
                     logger.warning(etcdServiceInstanceId + ": ZooKeeper client not connected when trying to get leader data. State: " + (zooKeeperClient != null ? zooKeeperClient.getState() : "null"));
-                    return null; // Cannot proceed if ZK client isn't usable
+                    return null;
                 }
                 String leaderData = leaderElection.getCurrentLeaderData();
                 if (leaderData != null && !leaderData.isEmpty()) {
@@ -376,12 +386,8 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
         }
         if (leaderElection != null) leaderElection.close();
         if (etcdClient != null) {
-            etcdClient.deregisterService(etcdServiceBasePath, etcdServiceInstanceId); // General dereg
-            // Only attempt to deregister leader key if it was the leader,
-            // though etcdClient.deregisterService is safe if key doesn't exist
-            if (isCurrentlyLeader) { // Check the flag
-                etcdClient.deregisterService(etcdServiceBasePath, etcdLeaderKey);
-            }
+            etcdClient.deregisterService(etcdServiceBasePath, etcdServiceInstanceId);
+            if (isCurrentlyLeader) etcdClient.deregisterService(etcdServiceBasePath, etcdLeaderKey);
             etcdClient.shutdownHeartbeat();
         }
         if (zooKeeperClient != null) {

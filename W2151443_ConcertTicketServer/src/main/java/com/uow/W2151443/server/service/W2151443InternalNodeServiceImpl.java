@@ -25,31 +25,55 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
         this.serverApp = serverAppInstance;
     }
 
+    /**
+     * Allows the ConcertTicketServerApp (acting as DistributedTxListener) to clean up
+     * the participant entry once a transaction is globally committed or aborted.
+     * @param transactionId The ID of the transaction whose participant should be removed.
+     */
+    public void removeActiveParticipant(String transactionId) {
+        DistributedTxParticipant removed = activeParticipants.remove(transactionId);
+        if (removed != null) {
+            logger.info(serverApp.etcdServiceInstanceId + ": Removed active participant for completed TxID: " + transactionId);
+        } else {
+            logger.fine(serverApp.etcdServiceInstanceId + ": Attempted to remove participant for TxID: " + transactionId + ", but it was not found (possibly already removed or never added).");
+        }
+    }
+
+
     @Override
     public void prepareTransaction(TransactionRequest request, StreamObserver<VoteResponse> responseObserver) {
         String transactionId = request.getTransactionId();
         ReserveComboRequest comboDetails = request.getOriginalComboRequest();
-        logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Received PREPARE_TRANSACTION request for TxID: " + transactionId + " for show: " + comboDetails.getShowId());
+        logger.info(serverApp.etcdServiceInstanceId + ": Received PREPARE_TRANSACTION request for TxID: " + transactionId + " for show: " + comboDetails.getShowId());
 
-        // The serverApp itself is the DistributedTxListener for actions on its own data
+        // Check if this transaction is already being handled (e.g., duplicate PREPARE from leader)
+        if (activeParticipants.containsKey(transactionId)) {
+            logger.warning(serverApp.etcdServiceInstanceId + ": Duplicate PREPARE_TRANSACTION request for TxID: " + transactionId + ". Ignoring.");
+            // Send a simple ACK that it's being handled, or a specific error if appropriate.
+            // For now, let's just ACK to avoid client timeout on leader if this is a retry.
+            responseObserver.onNext(VoteResponse.newBuilder()
+                    .setTransactionId(transactionId)
+                    .setVoteCommit(true) // Still ACK the receipt.
+                    .setNodeId(serverApp.etcdServiceInstanceId)
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
         DistributedTxParticipant participant = new DistributedTxParticipant(serverApp, transactionId, comboDetails, serverApp);
         activeParticipants.put(transactionId, participant);
 
         try {
-            participant.prepareAndVote(); // This will do local checks and write vote to ZooKeeper
-            // The VoteResponse from the participant to the coordinator is just an ACK.
-            // The actual vote (COMMIT/ABORT) is written to ZooKeeper by the participant.
-            // The coordinator reads these votes from ZooKeeper.
-            // So, this RPC response doesn't need to convey the actual vote decision.
+            participant.prepareAndVote();
             responseObserver.onNext(VoteResponse.newBuilder()
                     .setTransactionId(transactionId)
-                    .setVoteCommit(true) // Indicating prepare was received and processing initiated.
+                    .setVoteCommit(true)
                     .setNodeId(serverApp.etcdServiceInstanceId)
                     .build());
             responseObserver.onCompleted();
-            logger.info(serverApp.etcdServiceInstanceId + " (Secondary): PREPARE_TRANSACTION processed for TxID: " + transactionId + ". Voted and watching ZK.");
+            logger.info(serverApp.etcdServiceInstanceId + ": PREPARE_TRANSACTION processed for TxID: " + transactionId + ". Voted and watching ZK.");
         } catch (Exception e) {
-            logger.log(Level.SEVERE, serverApp.etcdServiceInstanceId + " (Secondary): Error during prepareAndVote for TxID: " + transactionId, e);
+            logger.log(Level.SEVERE, serverApp.etcdServiceInstanceId + ": Error during prepareAndVote for TxID: " + transactionId, e);
             responseObserver.onError(Status.INTERNAL
                     .withDescription("Failed to process prepare phase: " + e.getMessage())
                     .withCause(e)
@@ -61,32 +85,28 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
     @Override
     public void commitTransaction(TransactionDecision request, StreamObserver<GenericResponse> responseObserver) {
         String transactionId = request.getTransactionId();
-        logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Received direct COMMIT_TRANSACTION instruction from leader for TxID: " + transactionId);
-        DistributedTxParticipant participant = activeParticipants.get(transactionId);
+        logger.info(serverApp.etcdServiceInstanceId + ": Received direct COMMIT_TRANSACTION instruction from leader for TxID: " + transactionId);
+        DistributedTxParticipant participant = activeParticipants.get(transactionId); // Do not remove here yet
         if (participant != null) {
-            participant.forceCommit(); // Trigger local commit logic via the listener
-            activeParticipants.remove(transactionId); // Clean up
-            logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Local commit processed for TxID: " + transactionId);
+            participant.forceCommit(); // This will trigger the listener in ServerApp, which then calls removeActiveParticipant
         } else {
-            logger.warning(serverApp.etcdServiceInstanceId + " (Secondary): No active participant found for commit instruction on TxID: " + transactionId + ". Might have already processed via ZK watch or timed out.");
+            logger.warning(serverApp.etcdServiceInstanceId + ": No active participant found for commit instruction on TxID: " + transactionId + ". Might have already processed via ZK watch or timed out.");
         }
-        responseObserver.onNext(GenericResponse.newBuilder().setSuccess(true).setMessage("Commit instruction processed by " + serverApp.etcdServiceInstanceId).build());
+        responseObserver.onNext(GenericResponse.newBuilder().setSuccess(true).setMessage("Commit instruction acknowledged by " + serverApp.etcdServiceInstanceId).build());
         responseObserver.onCompleted();
     }
 
     @Override
     public void abortTransaction(TransactionDecision request, StreamObserver<GenericResponse> responseObserver) {
         String transactionId = request.getTransactionId();
-        logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Received direct ABORT_TRANSACTION instruction from leader for TxID: " + transactionId);
-        DistributedTxParticipant participant = activeParticipants.get(transactionId);
+        logger.info(serverApp.etcdServiceInstanceId + ": Received direct ABORT_TRANSACTION instruction from leader for TxID: " + transactionId);
+        DistributedTxParticipant participant = activeParticipants.get(transactionId); // Do not remove here yet
         if (participant != null) {
-            participant.forceAbort(); // Trigger local abort logic via the listener
-            activeParticipants.remove(transactionId); // Clean up
-            logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Local abort processed for TxID: " + transactionId);
+            participant.forceAbort(); // This will trigger the listener in ServerApp
         } else {
-            logger.warning(serverApp.etcdServiceInstanceId + " (Secondary): No active participant found for abort instruction on TxID: " + transactionId + ". Might have already processed.");
+            logger.warning(serverApp.etcdServiceInstanceId + ": No active participant found for abort instruction on TxID: " + transactionId + ". Might have already processed.");
         }
-        responseObserver.onNext(GenericResponse.newBuilder().setSuccess(true).setMessage("Abort instruction processed by " + serverApp.etcdServiceInstanceId).build());
+        responseObserver.onNext(GenericResponse.newBuilder().setSuccess(true).setMessage("Abort instruction acknowledged by " + serverApp.etcdServiceInstanceId).build());
         responseObserver.onCompleted();
     }
 
@@ -101,7 +121,6 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
         logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Applying ReplicateShowUpdate for Show ID: " + showId + ", Name: " + replicatedShowInfo.getShowName());
         synchronized (showsData) {
             if ("DELETED".equals(replicatedShowInfo.getShowName())) {
-                // This is a marker for deletion
                 ShowInfo removed = showsData.remove(showId);
                 if (removed != null) {
                     logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Successfully processed DELETED marker for Show ID: " + showId);
@@ -120,14 +139,12 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
     @Override
     public void replicateStockChange(UpdateStockRequest stockChangeRequest, StreamObserver<GenericResponse> responseObserver) {
         if (serverApp.isLeader()) {
-            logger.severe(serverApp.etcdServiceInstanceId + " (Leader): Received replicateStockChange RPC. This should ideally be deprecated or handled carefully.");
+            logger.severe(serverApp.etcdServiceInstanceId + " (Leader): Received replicateStockChange RPC. This should be deprecated or handled carefully.");
             responseObserver.onError(Status.FAILED_PRECONDITION.withDescription("Leader node should not receive replicateStockChange if full ShowInfo replication is used.").asRuntimeException());
             return;
         }
-        // This method is likely less used if full ShowInfo is replicated upon every change.
-        // If it were to be used, it needs careful delta application.
         String showId = stockChangeRequest.getShowId();
-        logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Applying ReplicateStockChange for show ID: " + showId + ". (Note: This method might be deprecated in favor of full ShowInfo replication)");
+        logger.info(serverApp.etcdServiceInstanceId + " (Secondary): Applying ReplicateStockChange for show ID: " + showId + ". (Note: Prefer full ShowInfo replication)");
         synchronized (showsData) {
             ShowInfo currentShow = showsData.get(showId);
             if (currentShow == null) {
@@ -141,14 +158,22 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
             if (stockChangeRequest.hasTierId() && stockChangeRequest.hasChangeInTierStock()) {
                 TierDetails tier = currentShow.getTiersMap().get(stockChangeRequest.getTierId());
                 if (tier != null) {
-                    TierDetails updatedTier = tier.toBuilder().setCurrentStock(tier.getCurrentStock() + stockChangeRequest.getChangeInTierStock()).build();
+                    // This logic should be carefully reviewed. Delta updates can be tricky.
+                    // The new stock should be what the leader calculated.
+                    // For simplicity, if this RPC is used, it's assumed the `changeInTierStock` is the *final* stock,
+                    // or it's a delta that the leader determined.
+                    // Given current design: leader sends full ShowInfo, so this is less likely used.
+                    // If it IS a delta:
+                    int newStock = tier.getCurrentStock() + stockChangeRequest.getChangeInTierStock();
+                    TierDetails updatedTier = tier.toBuilder().setCurrentStock(newStock).build();
                     showBuilder.putTiers(stockChangeRequest.getTierId(), updatedTier);
                     changed = true;
                 }
             }
             if (stockChangeRequest.hasChangeInAfterPartyStock()) {
                 if(currentShow.getAfterPartyAvailable()){
-                    showBuilder.setAfterPartyCurrentStock(currentShow.getAfterPartyCurrentStock() + stockChangeRequest.getChangeInAfterPartyStock());
+                    int newAPStock = currentShow.getAfterPartyCurrentStock() + stockChangeRequest.getChangeInAfterPartyStock();
+                    showBuilder.setAfterPartyCurrentStock(newAPStock);
                     changed = true;
                 }
             }
@@ -156,7 +181,7 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
                 showsData.put(showId, showBuilder.build());
             }
         }
-        responseObserver.onNext(GenericResponse.newBuilder().setSuccess(true).setMessage("Stock change replicated on " + serverApp.etcdServiceInstanceId + " (if applicable).").build());
+        responseObserver.onNext(GenericResponse.newBuilder().setSuccess(true).setMessage("Stock change (potentially) replicated on " + serverApp.etcdServiceInstanceId).build());
         responseObserver.onCompleted();
     }
 
@@ -169,8 +194,8 @@ public class W2151443InternalNodeServiceImpl extends W2151443InternalNodeService
         }
         logger.info(serverApp.etcdServiceInstanceId + " (Leader): Received GetFullState request from: " + request.getRequestingNodeId());
         FullStateResponse.Builder responseBuilder = FullStateResponse.newBuilder();
-        synchronized (showsData) { // Ensure consistent read of the map
-            responseBuilder.putAllAllShowsData(new ConcurrentHashMap<>(showsData)); // Send a copy
+        synchronized (showsData) {
+            responseBuilder.putAllAllShowsData(new ConcurrentHashMap<>(showsData));
         }
         logger.info(serverApp.etcdServiceInstanceId + " (Leader): Sending full state with " + responseBuilder.getAllShowsDataCount() + " shows to " + request.getRequestingNodeId());
         responseObserver.onNext(responseBuilder.build());
