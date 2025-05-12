@@ -1,10 +1,6 @@
 package com.uow.W2151443.coordination.twopc;
 
-import com.uow.W2151443.concert.service.GenericResponse;
-import com.uow.W2151443.concert.service.ReserveComboRequest; // For the operation details
-import com.uow.W2151443.concert.service.TransactionRequest;
-import com.uow.W2151443.concert.service.VoteResponse;
-import com.uow.W2151443.concert.service.W2151443InternalNodeServiceGrpc;
+import com.uow.W2151443.concert.service.*;
 import com.uow.W2151443.discovery.W2151443EtcdNameServiceClient.ServiceInstance; // To know participant addresses
 import com.uow.W2151443.server.ConcertTicketServerApp; // To get its own details and etcd client
 

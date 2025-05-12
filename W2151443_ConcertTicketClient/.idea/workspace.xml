@@ -5,15 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0548aa78-c273-41e0-96d6-a0ee5773db67" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/twopc/DistributedTransaction.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/twopc/DistributedTxCoordinator.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/twopc/DistributedTxListener.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/twopc/DistributedTxParticipant.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/W2151443LeaderElection.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/coordination/W2151443LeaderElection.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443InternalNodeServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443InternalNodeServiceImpl.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443ReservationServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443ReservationServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443ShowManagementServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/service/W2151443ShowManagementServiceImpl.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
