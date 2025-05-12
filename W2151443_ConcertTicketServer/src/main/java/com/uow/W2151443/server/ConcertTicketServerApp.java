@@ -1,56 +1,67 @@
+// File: distributedSyStemsCW/W2151443_ConcertTicketServer/src/main/java/com/uow/W2151443/server/ConcertTicketServerApp.java
 package com.uow.W2151443.server;
 
+import com.uow.W2151443.concert.service.ReserveComboRequest;
 import com.uow.W2151443.concert.service.ShowInfo;
-import com.uow.W2151443.coordination.W2151443LeaderElection; // Import LeaderElection class
+import com.uow.W2151443.concert.service.ReservationItem;
+import com.uow.W2151443.concert.service.TierDetails;
+import com.uow.W2151443.coordination.W2151443LeaderElection;
+import com.uow.W2151443.coordination.twopc.DistributedTxListener;
+import com.uow.W2151443.coordination.twopc.DistributedTransaction;
 import com.uow.W2151443.discovery.W2151443EtcdNameServiceClient;
 import com.uow.W2151443.server.service.W2151443InternalNodeServiceImpl;
 import com.uow.W2151443.server.service.W2151443ReservationServiceImpl;
 import com.uow.W2151443.server.service.W2151443ShowManagementServiceImpl;
+
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
 
 import java.io.IOException;
-// import java.net.InetAddress;
-// import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChangeListener { // Implement listener
+public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChangeListener, DistributedTxListener {
     private static final Logger logger = Logger.getLogger(ConcertTicketServerApp.class.getName());
     private Server grpcServer;
     private final int grpcPort;
-    private final String serverHostIp; // IP this server will advertise
+    private final String serverHostIp;
 
-    private final Map<String, ShowInfo> W2151443_showsDataStore = new ConcurrentHashMap<>();
+    public final Map<String, ShowInfo> W2151443_showsDataStore = new ConcurrentHashMap<>();
 
-    // etcd related fields
     public W2151443EtcdNameServiceClient etcdClient;
-    private final String etcdUrl = "http://localhost:2381"; // Your etcd instance URL
+    public final String etcdUrl = "http://localhost:2381";
     public final String etcdServiceBasePath = "/services/W2151443ConcertTicketService";
-    private final String etcdLeaderPath = etcdServiceBasePath + "/_leader"; // Specific key for current leader
-    public String etcdServiceInstanceId; // Unique ID for this server's general registration
+    private final String etcdLeaderKey = "_leader";
+    public String etcdServiceInstanceId;
     private final int serviceRegistryTTL = 30;
 
-    // ZooKeeper related fields
     private W2151443LeaderElection leaderElection;
-    private final String zooKeeperUrl = "localhost:2181"; // Your ZooKeeper instance URL
+    private final String zooKeeperUrl = "localhost:2181";
     private final String zkElectionBasePath = "/W2151443_concert_election";
-    private volatile boolean isCurrentlyLeader = false; // Current leadership status
+    private volatile boolean isCurrentlyLeader = false;
+    private ZooKeeper zooKeeperClient;
 
-    public ConcertTicketServerApp(int grpcPort, String serverIdSuffix) { // Suffix for unique instance IDs if running multiple locally
+    public final Map<String, ReserveComboRequest> pendingComboTransactions = new ConcurrentHashMap<>();
+    private final W2151443LeaderElection.LeaderChangeListener leaderChangeListener = this; // Explicitly for clarity
+    private final DistributedTxListener distributedTxListener = this; // Explicitly for clarity
+
+
+    public ConcertTicketServerApp(int grpcPort, String serverIdSuffix) {
         this.grpcPort = grpcPort;
-        this.serverHostIp = getHostIpAddress(); // Get IP once
+        this.serverHostIp = getHostIpAddress();
         this.etcdServiceInstanceId = "node-W2151443-" + serverIdSuffix + "-" + UUID.randomUUID().toString().substring(0, 4);
     }
 
     private String getHostIpAddress() {
-        // For local testing, "127.0.0.1" is fine.
-        // In a real multi-machine setup, this needs to be the actual routable IP.
         return "127.0.0.1";
     }
 
@@ -62,89 +73,165 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
         return isCurrentlyLeader;
     }
 
-    public void start() throws Exception { // Changed to throws Exception for ZK
-        // Initialize etcd client (used for general registration and by leader to publish its address)
-        logger.info("Initializing etcd client for URL: " + etcdUrl);
+    public ZooKeeper getZooKeeperClient() {
+        if (zooKeeperClient == null || zooKeeperClient.getState() != ZooKeeper.States.CONNECTED) {
+            logger.warning(etcdServiceInstanceId + ": Attempted to get ZooKeeper client, but it's null or not connected. State: " + (zooKeeperClient != null ? zooKeeperClient.getState() : "null"));
+        }
+        return zooKeeperClient;
+    }
+
+    private void initializeZooKeeper() throws IOException, InterruptedException {
+        logger.info(etcdServiceInstanceId + ": Initializing shared ZooKeeper client for URL: " + zooKeeperUrl);
+        final CountDownLatch zkConnectedLatch = new CountDownLatch(1);
+        zooKeeperClient = new ZooKeeper(zooKeeperUrl, 15000, new Watcher() {
+            @Override
+            public void process(WatchedEvent watchedEvent) {
+                logger.info(etcdServiceInstanceId + ": Main ZooKeeper Event: " + watchedEvent);
+                if (watchedEvent.getState() == Event.KeeperState.SyncConnected) {
+                    if (zkConnectedLatch.getCount() > 0) {
+                        zkConnectedLatch.countDown();
+                        logger.info(etcdServiceInstanceId + ": Main ZooKeeper client connected state received.");
+                    }
+                    if (leaderElection != null && !isCurrentlyLeader) {
+                        logger.info(etcdServiceInstanceId + ": Main ZooKeeper client reconnected. Re-evaluating leadership status.");
+                        try {
+                            leaderElection.volunteerForLeadership();
+                        } catch (KeeperException | InterruptedException e) {
+                            logger.log(Level.SEVERE, etcdServiceInstanceId + ": Error re-volunteering for leadership after ZK reconnection.", e);
+                            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                        }
+                    }
+                } else if (watchedEvent.getState() == Event.KeeperState.Expired) {
+                    logger.severe(etcdServiceInstanceId + ": Main ZooKeeper session EXPIRED. This is critical.");
+                    isCurrentlyLeader = false;
+                    leaderChangeListener.onWorker(); // Call onWorker via the LeaderChangeListener reference
+                    try {
+                        logger.info(etcdServiceInstanceId + ": Attempting to re-initialize ZooKeeper connection and leader election after session expiry.");
+                        if (zooKeeperClient != null) try { zooKeeperClient.close(); } catch (InterruptedException ignored) {}
+                        initializeZooKeeper();
+                        if (leaderElection != null) {
+                            leaderElection.close();
+                            leaderElection = new W2151443LeaderElection(zooKeeperClient, zkElectionBasePath, etcdServiceInstanceId, getServerAddress(), leaderChangeListener);
+                            leaderElection.volunteerForLeadership();
+                        }
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, etcdServiceInstanceId + ": Failed to recover from ZooKeeper session expiry.", e);
+                        System.exit(1);
+                    }
+                } else if (watchedEvent.getState() == Event.KeeperState.Disconnected) {
+                    logger.warning(etcdServiceInstanceId + ": Main ZooKeeper client DISCONNECTED. ZooKeeper client will attempt to auto-reconnect.");
+                    if (isCurrentlyLeader) {
+                        logger.warning(etcdServiceInstanceId + ": Was leader, but now disconnected from ZK. Acting as worker until reconnected and leadership re-confirmed.");
+                        isCurrentlyLeader = false;
+                        leaderChangeListener.onWorker(); // Call onWorker via the LeaderChangeListener reference
+                    }
+                }
+            }
+        });
+
+        if (!zkConnectedLatch.await(20, TimeUnit.SECONDS)) {
+            logger.severe(etcdServiceInstanceId + ": Timed out waiting for main ZooKeeper client to connect to " + zooKeeperUrl);
+            if (zooKeeperClient != null) try { zooKeeperClient.close(); } catch (InterruptedException ignored) {}
+            throw new IOException("Failed to connect main ZooKeeper client to " + zooKeeperUrl + " within timeout.");
+        }
+        logger.info(etcdServiceInstanceId + ": Main ZooKeeper client connected successfully with session ID: " + Long.toHexString(zooKeeperClient.getSessionId()));
+    }
+
+
+    public void start() throws Exception {
+        logger.info("W2151443 Server Instance " + etcdServiceInstanceId + " starting on port " + grpcPort + "...");
+
+        logger.info(etcdServiceInstanceId + ": Initializing etcd client for URL: " + etcdUrl);
         etcdClient = new W2151443EtcdNameServiceClient(etcdUrl);
 
-        // 1. Start Leader Election Process with ZooKeeper
-        logger.info("Initializing Leader Election with ZooKeeper at " + zooKeeperUrl + ", path " + zkElectionBasePath);
-        leaderElection = new W2151443LeaderElection(zooKeeperUrl, zkElectionBasePath,
-                etcdServiceInstanceId, getServerAddress(), this); // Pass 'this' as listener
-        leaderElection.connect();
-        leaderElection.volunteerForLeadership(); // This will trigger onElectedLeader or onWorker
+        initializeZooKeeper();
 
-        // 2. Start gRPC Server
-        // Pass 'this' (ConcertTicketServerApp) to services so they can query 'isLeader()'
-        // and potentially get leader address for forwarding (though forwarding logic is in services)
+        try {
+            DistributedTransaction.ensureTransactionRootExists(zooKeeperClient);
+        } catch (KeeperException | InterruptedException e) {
+            logger.log(Level.SEVERE, etcdServiceInstanceId + ": CRITICAL - Failed to ensure/create ZooKeeper transaction root path: " + DistributedTransaction.TRANSACTION_ROOT_ZNODE + ". 2PC will fail.", e);
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw e;
+        }
+
+        logger.info(etcdServiceInstanceId + ": Initializing Leader Election using shared ZK client, path " + zkElectionBasePath);
+        leaderElection = new W2151443LeaderElection(zooKeeperClient, zkElectionBasePath,
+                etcdServiceInstanceId, getServerAddress(), this); // 'this' is the LeaderChangeListener
+        leaderElection.volunteerForLeadership();
+
         W2151443ShowManagementServiceImpl showManagementService = new W2151443ShowManagementServiceImpl(W2151443_showsDataStore, this);
         W2151443ReservationServiceImpl reservationService = new W2151443ReservationServiceImpl(W2151443_showsDataStore, this);
-        W2151443InternalNodeServiceImpl internalNodeService = new W2151443InternalNodeServiceImpl(W2151443_showsDataStore, this); // Pass 'this'
+        W2151443InternalNodeServiceImpl internalNodeService = new W2151443InternalNodeServiceImpl(W2151443_showsDataStore, this);
 
         grpcServer = ServerBuilder.forPort(grpcPort)
                 .addService(showManagementService)
                 .addService(reservationService)
-                .addService(internalNodeService) // Make sure this line is present
+                .addService(internalNodeService)
                 .build()
                 .start();
         logger.info("W2151443 gRPC Server started, listening on port: " + grpcPort + " with instance ID: " + etcdServiceInstanceId);
 
-
-        // 3. General Service Registration with etcd (all nodes do this)
-        logger.info("Attempting general service registration with etcd for instance: " + etcdServiceInstanceId);
+        logger.info(etcdServiceInstanceId + ": Attempting general service registration with etcd.");
         boolean generalRegistration = etcdClient.registerService(etcdServiceBasePath, etcdServiceInstanceId, serverHostIp, grpcPort, serviceRegistryTTL);
         if (generalRegistration) {
-            logger.info("General registration for " + etcdServiceInstanceId + " successful with etcd.");
+            logger.info("General registration for " + etcdServiceInstanceId + " (" + getServerAddress() + ") successful with etcd.");
         } else {
             logger.severe("CRITICAL: Failed general registration for " + etcdServiceInstanceId + " with etcd.");
         }
 
-
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): Initiating shutdown sequence...");
-            if (leaderElection != null) {
-                System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): Closing ZooKeeper leader election session...");
-                leaderElection.close(); // This will remove its ephemeral znode
+            System.err.println("--- W2151443 Server (" + etcdServiceInstanceId + "): Initiating shutdown sequence... ---");
+            if (grpcServer != null && !grpcServer.isShutdown()) {
+                System.err.println("Shutting down gRPC server for " + etcdServiceInstanceId + "...");
+                try {
+                    grpcServer.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    grpcServer.shutdownNow(); Thread.currentThread().interrupt();
+                } finally {
+                    System.err.println("gRPC server for " + etcdServiceInstanceId + (grpcServer.isTerminated() ? " shut down." : " shutdown process completed (may not be fully terminated)."));
+                }
+            }
+
+            if (isCurrentlyLeader && etcdClient != null) {
+                System.err.println("Leader " + etcdServiceInstanceId + " attempting to deregister its _leader key from etcd...");
+                etcdClient.deregisterService(etcdServiceBasePath, etcdLeaderKey);
             }
             if (etcdClient != null) {
-                System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): Deregistering from etcd...");
-                if (isCurrentlyLeader) { // If it was leader, try to remove leader key
-                    etcdClient.deregisterService(etcdLeaderPath, "leader-" + etcdServiceInstanceId); // Or a fixed key like "current"
-                }
-                etcdClient.deregisterService(etcdServiceBasePath, etcdServiceInstanceId); // Deregister its own instance
+                System.err.println("Deregistering general instance " + etcdServiceInstanceId + " from etcd...");
+                etcdClient.deregisterService(etcdServiceBasePath, etcdServiceInstanceId);
                 etcdClient.shutdownHeartbeat();
-                System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): Etcd client resources released.");
             }
-            if (grpcServer != null && !grpcServer.isShutdown()) {
-                System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): Shutting down gRPC server...");
-                try {
-                    grpcServer.shutdown().awaitTermination(10, TimeUnit.SECONDS); // Shorter timeout
-                    System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): gRPC server shut down.");
-                } catch (InterruptedException e) {
-                    System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): gRPC server shutdown interrupted.");
-                    grpcServer.shutdownNow();
-                    Thread.currentThread().interrupt();
-                }
+
+            if (leaderElection != null) {
+                System.err.println("Closing ZooKeeper leader election resources for " + etcdServiceInstanceId + "...");
+                leaderElection.close();
             }
-            System.err.println("*** W2151443 Server (" + etcdServiceInstanceId + "): Shutdown sequence complete.");
+            if (zooKeeperClient != null) {
+                System.err.println("Closing main ZooKeeper client for " + etcdServiceInstanceId + "...");
+                try { zooKeeperClient.close(); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            }
+            System.err.println("--- W2151443 Server (" + etcdServiceInstanceId + "): Shutdown sequence complete. ---");
         }));
+        logger.info(etcdServiceInstanceId + ": Server startup sequence complete.");
     }
+
 
     @Override
     public void onElectedLeader() {
+        boolean wasAlreadyLeader = isCurrentlyLeader;
         isCurrentlyLeader = true;
-        logger.info("***** " + etcdServiceInstanceId + " (" + getServerAddress() + ") HAS BEEN ELECTED LEADER! *****");
-        // Leader registers its specific address in etcd under the _leader key
-        if (etcdClient != null) {
-            // For simplicity, the leader's unique key could be its own instance ID prefixed
-            // Or a fixed key like "/services/W2151443ConcertTicketService/_leader"
-            // with the value being its address. Let's use a fixed key for the leader.
-            boolean leaderRegistered = etcdClient.registerService(etcdServiceBasePath, "_leader", serverHostIp, grpcPort, serviceRegistryTTL);
-            if(leaderRegistered) {
-                logger.info("Leader " + etcdServiceInstanceId + " published its address (" + getServerAddress() + ") to etcd path: " + etcdServiceBasePath + "/_leader");
-            } else {
-                logger.severe("Leader " + etcdServiceInstanceId + " FAILED to publish its address to etcd path: " + etcdServiceBasePath + "/_leader");
+        if (!wasAlreadyLeader) {
+            logger.info("***** " + etcdServiceInstanceId + " (" + getServerAddress() + ") HAS BEEN ELECTED LEADER! *****");
+            if (etcdClient != null) {
+                boolean leaderAdvertised = etcdClient.registerService(etcdServiceBasePath, etcdLeaderKey, serverHostIp, grpcPort, serviceRegistryTTL);
+                if (leaderAdvertised) {
+                    logger.info("Leader " + etcdServiceInstanceId + " published its address (" + getServerAddress() + ") to etcd path: " + etcdServiceBasePath + "/" + etcdLeaderKey);
+                } else {
+                    logger.severe("CRITICAL: Leader " + etcdServiceInstanceId + " FAILED to publish its address to etcd leader path: " + etcdServiceBasePath + "/" + etcdLeaderKey);
+                }
             }
+        } else {
+            logger.fine(etcdServiceInstanceId + " (" + getServerAddress() + ") already leader, onElectedLeader callback received (possibly due to ZK re-check).");
         }
     }
 
@@ -152,30 +239,93 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
     public void onWorker() {
         boolean wasLeader = isCurrentlyLeader;
         isCurrentlyLeader = false;
-        logger.info("----- " + etcdServiceInstanceId + " (" + getServerAddress() + ") IS A WORKER.-----");
-        // If it *was* leader and now it's not (e.g. due to partition then recovery, or session expiry),
-        // it should attempt to remove the _leader key *if it was the one that set it*.
-        // This is tricky without knowing if it successfully set it or if another node took over.
-        // A simpler approach is that the new leader will overwrite the _leader key.
-        // For explicit cleanup if it steps down:
-        if (wasLeader && etcdClient != null) {
-            logger.info("Worker " + etcdServiceInstanceId + " was previously leader, attempting to clean up its _leader entry in etcd.");
-            // This deregister should ideally only happen if this node was the one that wrote to _leader.
-            // Using a simple deregister for now. The new leader will overwrite anyway.
-            etcdClient.deregisterService(etcdServiceBasePath, "_leader");
+        if (wasLeader) {
+            logger.info("----- " + etcdServiceInstanceId + " (" + getServerAddress() + ") IS NO LONGER LEADER, NOW A WORKER. -----");
+        } else {
+            logger.fine(etcdServiceInstanceId + " (" + getServerAddress() + ") confirmed as WORKER or was already worker.");
         }
     }
 
-    public String getLeaderAddressFromZooKeeper() { // For secondaries to find the leader
+    @Override
+    public void onGlobalCommit(String transactionIdContext) {
+        String coreTransactionId = transactionIdContext.contains("_") ?
+                transactionIdContext.substring(0, transactionIdContext.indexOf("_")) :
+                transactionIdContext;
+
+        ReserveComboRequest details = pendingComboTransactions.remove(coreTransactionId);
+
+        if (details == null) {
+            logger.warning(etcdServiceInstanceId + ": Received onGlobalCommit for unknown or already processed transaction context: " + transactionIdContext + " (core TxID: " + coreTransactionId + ")");
+            return;
+        }
+        logger.info(etcdServiceInstanceId + ": Applying GLOBAL COMMIT for TxID: " + coreTransactionId + " related to original request for Show: " + details.getShowId());
+        synchronized (W2151443_showsDataStore) {
+            ShowInfo currentShow = W2151443_showsDataStore.get(details.getShowId());
+            if (currentShow == null) {
+                logger.severe(etcdServiceInstanceId + ": CRITICAL - Show " + details.getShowId() + " not found during onGlobalCommit for TxID: " + coreTransactionId + ". Data inconsistency!");
+                return;
+            }
+
+            ShowInfo.Builder mutableShowBuilder = currentShow.toBuilder();
+            for (ReservationItem item : details.getConcertItemsList()) {
+                TierDetails tier = mutableShowBuilder.getTiersMap().get(item.getTierId());
+                if (tier != null) {
+                    TierDetails updatedTier = tier.toBuilder().setCurrentStock(tier.getCurrentStock() - item.getQuantity()).build();
+                    mutableShowBuilder.putTiers(item.getTierId(), updatedTier);
+                } else {
+                    logger.severe(etcdServiceInstanceId + ": CRITICAL - Tier " + item.getTierId() + " not found during onGlobalCommit for TxID: " + coreTransactionId);
+                }
+            }
+            if (currentShow.getAfterPartyAvailable() && details.getAfterPartyQuantity() > 0) {
+                mutableShowBuilder.setAfterPartyCurrentStock(Math.max(0, mutableShowBuilder.getAfterPartyCurrentStock() - details.getAfterPartyQuantity()));
+            }
+            ShowInfo updatedShowInfo = mutableShowBuilder.build();
+            W2151443_showsDataStore.put(details.getShowId(), updatedShowInfo);
+            logger.info(etcdServiceInstanceId + ": Local data committed for TxID: " + coreTransactionId + ". Show: " + details.getShowId() + " updated. New AP Stock: " + updatedShowInfo.getAfterPartyCurrentStock());
+        }
+    }
+
+    @Override
+    public void onGlobalAbort(String transactionIdContext) {
+        String coreTransactionId = transactionIdContext.contains("_") ?
+                transactionIdContext.substring(0, transactionIdContext.indexOf("_")) :
+                transactionIdContext;
+        ReserveComboRequest removed = pendingComboTransactions.remove(coreTransactionId);
+        if (removed != null) {
+            logger.info(etcdServiceInstanceId + ": Applying GLOBAL ABORT for transaction context: " + transactionIdContext + " (core TxID: " + coreTransactionId + "). Request details: " + removed.getRequestId());
+        } else {
+            logger.warning(etcdServiceInstanceId + ": Received onGlobalAbort for unknown or already processed transaction context: " + transactionIdContext);
+        }
+    }
+
+
+    public String getLeaderAddressFromZooKeeper() {
         if (leaderElection != null) {
             try {
-                return leaderElection.getCurrentLeaderData();
+                if (zooKeeperClient == null || zooKeeperClient.getState() != ZooKeeper.States.CONNECTED) {
+                    logger.warning(etcdServiceInstanceId + ": ZooKeeper client not connected when trying to get leader data. State: " + (zooKeeperClient != null ? zooKeeperClient.getState() : "null"));
+                    return null; // Cannot proceed if ZK client isn't usable
+                }
+                String leaderData = leaderElection.getCurrentLeaderData();
+                if (leaderData != null && !leaderData.isEmpty()) {
+                    logger.fine(etcdServiceInstanceId + ": Fetched leader data from ZooKeeper: " + leaderData);
+                    return leaderData;
+                } else {
+                    logger.warning(etcdServiceInstanceId + ": Leader data from ZooKeeper is null or empty.");
+                    return null;
+                }
             } catch (KeeperException | InterruptedException e) {
-                logger.log(Level.WARNING, "Failed to get current leader data from ZooKeeper for " + etcdServiceInstanceId, e);
+                logger.log(Level.WARNING, etcdServiceInstanceId + ": Failed to get current leader data from ZooKeeper", e);
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                return null;
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, etcdServiceInstanceId + ": Unexpected error getting leader data from ZooKeeper", e);
                 return null;
             }
+        } else {
+            logger.warning(etcdServiceInstanceId + ": LeaderElection object is null. Cannot get leader address.");
+            return null;
         }
-        return null;
     }
 
 
@@ -185,26 +335,58 @@ public class ConcertTicketServerApp implements W2151443LeaderElection.LeaderChan
         }
     }
 
-    // Main method to allow running multiple instances on different ports for testing
     public static void main(String[] args) throws Exception {
-        int grpcPort = 9090; // Default for the first instance
-        String idSuffix = "p" + grpcPort;
+        int grpcPort = 9090;
+        String idSuffix = "Srv" + grpcPort;
 
         if (args.length > 0) {
             try {
                 grpcPort = Integer.parseInt(args[0]);
-                idSuffix = "p" + grpcPort; // Update suffix based on port
+                idSuffix = "Srv" + grpcPort;
             } catch (NumberFormatException e) {
-                System.err.println("Invalid port number provided: " + args[0] + ". Using default port " + grpcPort);
+                System.err.println("Invalid port number: " + args[0] + ". Using default port " + grpcPort);
             }
         }
         if (args.length > 1) {
-            idSuffix = args[1]; // Allow specifying a unique ID suffix directly
+            idSuffix = args[1];
         }
 
-
         final ConcertTicketServerApp serverApp = new ConcertTicketServerApp(grpcPort, idSuffix);
-        serverApp.start();
-        serverApp.blockUntilShutdown();
+        try {
+            serverApp.start();
+            serverApp.blockUntilShutdown();
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Failed to start server " + serverApp.etcdServiceInstanceId, e);
+            serverApp.shutdownGracefully();
+        }
+    }
+
+    private void shutdownGracefully() {
+        logger.info("--- W2151443 Server (" + etcdServiceInstanceId + "): Initiating graceful shutdown due to startup failure... ---");
+        if (grpcServer != null && !grpcServer.isShutdown()) {
+            grpcServer.shutdown();
+            try {
+                if (!grpcServer.awaitTermination(5, TimeUnit.SECONDS)) {
+                    grpcServer.shutdownNow();
+                }
+            } catch (InterruptedException ex) {
+                grpcServer.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (leaderElection != null) leaderElection.close();
+        if (etcdClient != null) {
+            etcdClient.deregisterService(etcdServiceBasePath, etcdServiceInstanceId); // General dereg
+            // Only attempt to deregister leader key if it was the leader,
+            // though etcdClient.deregisterService is safe if key doesn't exist
+            if (isCurrentlyLeader) { // Check the flag
+                etcdClient.deregisterService(etcdServiceBasePath, etcdLeaderKey);
+            }
+            etcdClient.shutdownHeartbeat();
+        }
+        if (zooKeeperClient != null) {
+            try { zooKeeperClient.close(); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+        }
+        logger.info("--- W2151443 Server (" + etcdServiceInstanceId + "): Graceful shutdown attempt complete. ---");
     }
 }
